@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Application and ApplicationSet Finalizers — Argo CD</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#182028; --panel2:#1f2a35; --text:#e8eef4; --muted:#9fb0c0;
+    --accent:#4da3ff; --accent2:#7cd4fd; --border:#2b3a48; --code-bg:#0b1015;
+    --green:#3fb97f; --amber:#e5a63d; --radius:12px;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.65}
+  .wrap{max-width:960px;margin:0 auto;padding:40px 24px 80px}
+  header.hero{background:linear-gradient(135deg,#1b2a4a,#123f3a 60%,#1c2b1a);border:1px solid var(--border);border-radius:var(--radius);padding:32px 32px 28px;margin-bottom:28px}
+  header.hero h1{margin:0 0 8px;font-size:30px;letter-spacing:-.02em}
+  header.hero p{margin:0;color:var(--muted);max-width:70ch}
+  .badge{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#06281f;background:var(--green);border-radius:999px;padding:4px 12px;margin-bottom:14px}
+  nav.toc{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:28px}
+  nav.toc h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px}
+  nav.toc ol{margin:0;padding-left:20px}
+  nav.toc a{color:var(--accent2);text-decoration:none}
+  nav.toc a:hover{text-decoration:underline}
+  section.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:26px 28px;margin-bottom:22px}
+  section.card h2{margin-top:0;font-size:22px;letter-spacing:-.01em;border-bottom:1px solid var(--border);padding-bottom:10px}
+  section.card h3{font-size:17px;margin-top:26px;color:var(--accent2)}
+  code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:1px 7px;color:#ffd9a0}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:16px 18px;overflow:auto}
+  pre code{border:0;background:none;padding:0;color:#d8e6f5}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14.5px}
+  th,td{text-align:left;padding:11px 13px;border:1px solid var(--border);vertical-align:top}
+  th{background:var(--panel2);font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .callout{border-radius:10px;padding:14px 18px;margin:18px 0;border:1px solid}
+  .callout.no{background:rgba(229,166,61,.1);border-color:var(--amber)}
+  .callout.note{background:rgba(77,163,255,.1);border-color:var(--accent)}
+  .callout strong{display:block;margin-bottom:4px}
+  ol.steps{padding-left:22px}
+  ol.steps li{margin-bottom:12px}
+  ol.steps li::marker{color:var(--accent2);font-weight:700}
+  ul.tight li{margin-bottom:8px}
+  footer{color:var(--muted);font-size:13px;text-align:center;margin-top:36px}
+  a{color:var(--accent2)}
+  @media print{
+    body{background:#fff;color:#111}
+    header.hero,section.card,nav.toc{background:#fff;border-color:#ccc;color:#111}
+    header.hero p,nav.toc h2,footer{color:#555}
+    a{color:#0b5fc0}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="badge">Operator Manual</span>
+    <h1>Application and ApplicationSet Finalizers</h1>
+    <p>How the deletion finalizer works for the <code>Application</code> and <code>ApplicationSet</code>
+    custom resources, and which knobs exist to configure it. Companion to
+    <code>docs/operator-manual/application-finalizers.md</code>.</p>
+  </header>
+
+  <nav class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#annotation">Can the finalizer be configured with an annotation?</a></li>
+      <li><a href="#app">Application finalizer</a></li>
+      <li><a href="#flow">How the application-controller finalizes deletion</a></li>
+      <li><a href="#setting">Setting and removing the Application finalizer</a></li>
+      <li><a href="#appset">ApplicationSet finalizer behavior</a></li>
+      <li><a href="#config">Configuration summary</a></li>
+      <li><a href="#stuck">Troubleshooting stuck deletions</a></li>
+    </ol>
+  </nav>
+
+  <section class="card" id="annotation">
+    <h2>Short answer: can the finalizer be configured with an annotation?</h2>
+    <div class="callout no"><strong>✕ No — there is no annotation for this.</strong>
+      Neither <code>Application</code> nor <code>ApplicationSet</code> supports an annotation that
+      controls finalizer behavior. The finalizer is controlled exclusively by entries in
+      <code>.metadata.finalizers</code>, plus the flags/fields that add or remove those entries.</div>
+    <p>Argo CD annotations such as <code>argocd.argoproj.io/refresh</code>,
+    <code>argocd.argoproj.io/manifest-generate-paths</code>,
+    <code>argocd.argoproj.io/application-set-refresh</code> or
+    <code>argocd.argoproj.io/compare-options</code> have <strong>no effect</strong> on deletion / finalizer behavior.</p>
+  </section>
+
+  <section class="card" id="app">
+    <h2>Application finalizer</h2>
+    <h3>Finalizer values</h3>
+    <p>The application-controller treats any of the following three
+    <code>.metadata.finalizers</code> entries as a “cascade deletion” finalizer
+    (see <code>isPropagationPolicyFinalizer</code> in
+    <code>pkg/apis/application/v1alpha1/types.go</code>; constants in
+    <code>pkg/apis/application/v1alpha1/application_defaults.go</code>):</p>
+    <table>
+      <tr><th>Finalizer</th><th>Meaning</th></tr>
+      <tr><td><code>resources-finalizer.argocd.argoproj.io</code></td><td>Cascade delete; live resources are deleted with the <strong>foreground</strong> propagation policy (also the default the CLI/API applies when no explicit policy is given).</td></tr>
+      <tr><td><code>resources-finalizer.argocd.argoproj.io/foreground</code></td><td>Cascade delete with the <strong>foreground</strong> propagation policy.</td></tr>
+      <tr><td><code>resources-finalizer.argocd.argoproj.io/background</code></td><td>Cascade delete with the <strong>background</strong> propagation policy.</td></tr>
+    </table>
+    <h3>Helpers on the Application type</h3>
+    <ul class="tight">
+      <li><code>CascadedDeletion()</code> — true if any of the above finalizers is present.</li>
+      <li><code>GetPropagationPolicy()</code> — returns which finalizer is set.</li>
+      <li><code>SetCascadedDeletion(finalizer)</code> / <code>UnSetCascadedDeletion()</code> — add/remove propagation-policy finalizers.</li>
+      <li><code>IsFinalizerPresent(finalizer)</code> — checks for a specific finalizer.</li>
+    </ul>
+    <div class="callout note"><strong>Non-cascading delete</strong>
+      If none of these finalizers is present, deleting the <code>Application</code> removes only the
+      <code>Application</code> CR — live workload resources (<code>Deployments</code>, <code>Services</code>, …) are left orphaned.</div>
+    <h3>Foreground vs. background</h3>
+    <p>The only behavioral difference between the variants is the <code>PropagationPolicy</code> passed to the
+    Kubernetes API when the controller deletes each managed live object (<code>controller/appcontroller.go</code>):</p>
+    <ul class="tight">
+      <li>default / <code>/foreground</code> → <code>DeletePropagationForeground</code></li>
+      <li><code>/background</code> → <code>DeletePropagationBackground</code></li>
+    </ul>
+  </section>
+
+  <section class="card" id="flow">
+    <h2>How the application-controller finalizes deletion</h2>
+    <p>When an <code>Application</code> with a <code>DeletionTimestamp</code> still carries one of the
+    finalizers, <code>processAppQueueItem</code> in <code>controller/appcontroller.go</code> calls
+    <code>finalizeApplicationDeletion</code>:</p>
+    <ol class="steps">
+      <li><strong>Resolve destination &amp; project.</strong> If the destination cluster no longer exists
+        (<code>validDestination == false</code>), live-object cleanup is skipped; the controller drops its
+        cache entries and removes the finalizer so deletion can’t get stuck on a dangling cluster reference.</li>
+      <li><strong>List managed live objects</strong> (<code>getPermittedAppLiveObjects</code>). Objects already
+        pending deletion make the controller wait (“<em>N objects remaining for deletion</em>”) and retry on subsequent reconciles.</li>
+      <li><strong>Delete each managed object</strong> with <code>DeletePropagationForeground</code> — or
+        <code>DeletePropagationBackground</code> for the <code>.../background</code> variant.</li>
+      <li><strong>Clear cache &amp; remove the finalizer</strong> (<code>SetAppManagedResources</code>,
+        <code>SetAppResourcesTree</code>, then <code>removeCascadeFinalizer → UnSetCascadedDeletion</code> via merge patch).
+        Removing the last finalizer lets Kubernetes GC finally remove the <code>Application</code> object.</li>
+    </ol>
+    <p>Deletion errors surface as an <code>ApplicationCondition</code> of type <code>DeletionError</code> plus an audit event.</p>
+  </section>
+
+  <section class="card" id="setting">
+    <h2>Setting and removing the Application finalizer</h2>
+    <h3>Argo CD CLI</h3>
+    <ul class="tight">
+      <li><code>argocd app delete APPNAME [--cascade]</code> — adds the finalizer automatically, then deletes (the default).</li>
+      <li><code>argocd app delete APPNAME --cascade --propagation-policy background|foreground</code> — selects the <code>/background</code> or <code>/foreground</code> variant (<code>getPropagationPolicyFinalizer</code>).</li>
+      <li><code>argocd app delete APPNAME --cascade=false</code> — removes the finalizers first, so only the <code>Application</code> CR is deleted.</li>
+      <li><code>argocd app create … --set-finalizer</code> — puts the finalizer on at creation time.</li>
+    </ul>
+    <h3>API &amp; kubectl / GitOps</h3>
+    <ul class="tight">
+      <li><strong>API:</strong> <code>ApplicationService.Delete</code> accepts <code>cascade</code> and <code>propagationPolicy</code> and patches <code>.metadata.finalizers</code> before deleting.</li>
+      <li><strong>Declarative:</strong> declare the finalizer on the resource, then delete it:
+      <pre><code>metadata:
+  finalizers: ["resources-finalizer.argocd.argoproj.io"]
+# kubectl delete applications.argoproj.io APPNAME</code></pre>
+      Omitting the finalizer means a non-cascading delete.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="appset">
+    <h2>ApplicationSet finalizer behavior</h2>
+    <div class="callout note"><strong>Key fact</strong>
+      The <code>ApplicationSet</code> CR itself has <strong>no Argo CD finalizer and no custom deletion handler</strong>:
+      <code>Reconcile</code> returns immediately when the set carries a <code>DeletionTimestamp</code>.
+      Generated <code>Application</code>s are removed purely by standard Kubernetes garbage collection via the
+      <code>ownerReference</code> (controller reference) each one carries.</div>
+    <ul class="tight">
+      <li><code>kubectl delete applicationset NAME</code> → generated <code>Application</code> CRs are deleted via owner-reference cascading; each app’s <strong>own</strong> finalizer then decides whether its workloads go too.</li>
+      <li><code>kubectl delete applicationset NAME --cascade=orphan</code> → keeps the generated <code>Application</code> CRs (and workloads).</li>
+      <li>Deleting the <code>ApplicationSet</code> never deletes anything directly — the applicationset-controller is not involved in that path.</li>
+    </ul>
+    <h3>Finalizers on generated Applications</h3>
+    <ol class="steps">
+      <li>If <code>spec.template.metadata.finalizers</code> declares finalizers, they are copied verbatim onto every generated <code>Application</code> (<code>getTempApplication</code>) and kept in sync — manual edits on a generated app are reverted on the next reconcile.</li>
+      <li>Otherwise <code>RenderTemplateParams</code> injects the default <code>resources-finalizer.argocd.argoproj.io</code> <strong>unless</strong> <code>spec.syncPolicy.preserveResourcesOnDeletion: true</code>, in which case generated apps get no finalizer (later deletions are non-cascading).</li>
+    </ol>
+    <h3>Pruning of generated Applications</h3>
+    <p>When generator output changes, <code>deleteInCluster</code> issues a plain <code>Delete</code>; the finalizer already on the
+    <code>Application</code> governs workload deletion. Special case: <code>removeFinalizerOnInvalidDestination</code> strips the
+    <code>resources-finalizer.argocd.argoproj.io</code> finalizer (only that exact value) before deletion if the destination no longer
+    matches a known cluster, so pruning can’t get stuck behind an un-honorable finalizer (issue #5817).</p>
+  </section>
+
+  <section class="card" id="config">
+    <h2>Configuration summary</h2>
+    <table>
+      <tr><th>Goal</th><th>How</th></tr>
+      <tr><td>Cascade-delete an <code>Application</code> (app + workloads)</td><td>Put one of the three <code>resources-finalizer.argocd.argoproj.io…</code> finalizers in <code>.metadata.finalizers</code> (CLI <code>--cascade</code> does this).</td></tr>
+      <tr><td>Non-cascading delete (keep workloads)</td><td>Ensure no finalizer is set (<code>--cascade=false</code> removes them).</td></tr>
+      <tr><td>Choose foreground / background deletion</td><td>Use the <code>/foreground</code> or <code>/background</code> variant (<code>--propagation-policy</code>).</td></tr>
+      <tr><td>Cascade-delete workloads of ApplicationSet-generated apps</td><td>Leave the default: no template finalizers, <code>preserveResourcesOnDeletion</code> unset / <code>false</code>.</td></tr>
+      <tr><td>Preserve workloads when generated apps are deleted</td><td>Set <code>spec.syncPolicy.preserveResourcesOnDeletion: true</code>.</td></tr>
+      <tr><td>Keep generated apps when deleting the set</td><td><code>kubectl delete applicationset NAME --cascade=orphan</code>.</td></tr>
+      <tr><td>Configure any of this via annotation</td><td>Not supported — no such annotation exists.</td></tr>
+    </table>
+  </section>
+
+  <section class="card" id="stuck">
+    <h2>Troubleshooting stuck deletions</h2>
+    <p>If an <code>Application</code> stays in <code>Terminating</code>, it is almost always the cascade finalizer waiting on live objects (or an unreachable cluster):</p>
+    <ul class="tight">
+      <li>Fix or remove the blocking live resources and let the controller finish.</li>
+      <li>Drop the cascade requirement by removing the finalizer (workloads are then orphaned, not deleted):
+        <pre><code>kubectl patch app APPNAME -p '{"metadata":{"finalizers":[]}}' --type merge</code></pre></li>
+      <li>For pruned ApplicationSet children pointing at deleted clusters, the controller already strips the finalizer automatically; if an app still hangs, check the same live-object causes.</li>
+    </ul>
+  </section>
+
+  <footer>Source: <code>docs/operator-manual/application-finalizers.md</code> · Code refs: <code>controller/appcontroller.go</code>, <code>applicationset/controllers/applicationset_controller.go</code>, <code>applicationset/utils/utils.go</code>, <code>pkg/apis/application/v1alpha1/types.go</code></footer>
+
+</div>
+</body>
+</html>
