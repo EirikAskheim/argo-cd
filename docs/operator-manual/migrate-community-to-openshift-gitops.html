@@ -259,7 +259,7 @@ oc delete namespace &lt;community-ns&gt;  # ONLY if the line above is empty / "N
   <p><strong>CLI path (pinned to the same choices):</strong></p>
 <pre><code>oc create namespace openshift-gitops --dry-run=client -o yaml | oc apply -f -
 cat &lt;&lt;EOF | oc apply -f -
-apiVersion: operators.coreos.com/v1:kind
+apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: openshift-gitops-operator-group
@@ -284,7 +284,7 @@ oc get subscription openshift-gitops-operator -n openshift-gitops -w
 oc get csv -n openshift-gitops -w   # PHASE → Succeeded
 oc get pods -n openshift-gitops     # server, controller, repo-server, redis, applicationset-controller
 oc get argocd openshift-gitops -n openshift-gitops   # default instance auto-created by the operator</code></pre>
-  <div class="callout warn"><strong>YAML typo guard.</strong> The heredoc above must read <code>apiVersion: operators.coreos.com/v1</code> on one line and <code>kind: OperatorGroup</code> on the next (no <code>:kind</code> suffix). If <code>oc apply</code> complains, re-check line breaks before retrying.</div>
+  
 </section>
 
 <section class="card" id="align">

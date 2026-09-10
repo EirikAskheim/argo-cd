@@ -78,6 +78,7 @@ nav:
       - operator-manual/notifications/services/webhook.md
   - operator-manual/troubleshooting.md
   - operator-manual/application-finalizers.md
+  - operator-manual/migrate-community-to-openshift-gitops.md
   - ApplicationSet:
     - Introduction: operator-manual/applicationset/index.md
     - Installations: operator-manual/applicationset/Getting-Started.md
